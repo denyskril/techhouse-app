@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for Keycloak
+  postgres:
+    image: postgres:16-alpine
+    container_name: keycloak-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mail_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak identity provider
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: keycloak
+    command:
+      - start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak_password
+      KC_HOSTNAME: localhost
+      KC_HTTP_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mail_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Exim4 mail server with Keycloak OAuth2 support
+  exim4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: exim4-mail
+    hostname: mail.example.com
+    environment:
+      # Keycloak Configuration
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: master
+      KEYCLOAK_CLIENT_ID: exim4-client
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-your-client-secret}
+      
+      # SMTP Configuration
+      SMTP_USERNAME: mailserver@example.com
+      SMTP_HOST: smtp.example.com
+      SMTP_PORT: 587
+      
+      # Exim4 Configuration
+      PRIMARY_HOSTNAME: mail.example.com
+      LOCAL_DOMAINS: example.com
+      
+      # Debugging
+      KEYCLOAK_DEBUG: ${DEBUG:-0}
+    ports:
+      - "25:25"     # SMTP
+      - "587:587"   # Submission
+      - "465:465"   # SMTPS
+    volumes:
+      - exim_spool:/var/spool/exim4
+      - exim_log:/var/log/exim4
+      - ./config:/etc/exim4:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - mail_network
+    restart: unless-stopped
+
+  # Mailhog for testing (catches outgoing emails)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP
+    networks:
+      - mail_network
+
+networks:
+  mail_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  exim_spool:
+  exim_log:

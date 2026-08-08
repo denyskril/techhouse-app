@@ -1,0 +1,45 @@
+# Environment variables
+.env
+
+# Logs
+*.log
+logs/
+
+# Cache and temporary files
+*.cache
+*.tmp
+/var/
+
+# Secrets
+*.secret
+*_secret
+credentials.conf
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes
+postgres_data/
+exim_spool/
+exim_log/
+
+# Token cache
+access_token.json
+refresh_token.json
+.token.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+test_emails/
+*.test
